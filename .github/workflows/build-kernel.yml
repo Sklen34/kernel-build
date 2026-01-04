@@ -1,4 +1,4 @@
-name: Build Kernel with KSU-Next and SUSFS
+name: Build Kernel - Update KSU-Next
 
 on:
   push:
@@ -21,7 +21,6 @@ jobs:
     - name: Clone kernel source
       run: |
         git clone --depth=1 https://github.com/Motorola-Miami/android_kernel_motorola_sm6375 kernel
-        cd kernel
     
     - name: Download toolchain
       run: |
@@ -29,21 +28,11 @@ jobs:
         cd toolchain
         wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/master.tar.gz
         tar -xzf master.tar.gz
-        cd ..
     
-    - name: Integrate KSU-Next
+    - name: Update KSU-Next
       run: |
         cd kernel
         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
-    
-    - name: Integrate SUSFS
-      run: |
-        cd kernel
-        git clone -b kernel-5.4 https://gitlab.com/simonpunk/susfs4ksu.git susfs
-        cp -r susfs/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
-        cp -r susfs/kernel_patches/50_add_susfs_in_kernel-5.4.patch .
-        patch -p1 < 10_enable_susfs_for_ksu.patch
-        patch -p1 < 50_add_susfs_in_kernel-5.4.patch
     
     - name: Download kernel config
       run: |
@@ -62,5 +51,5 @@ jobs:
     - name: Upload kernel image
       uses: actions/upload-artifact@v4
       with:
-        name: kernel-ksu-susfs
+        name: kernel-ksu-updated
         path: kernel/arch/arm64/boot/Image.gz-dtb
