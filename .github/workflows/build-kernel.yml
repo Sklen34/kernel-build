@@ -1,0 +1,66 @@
+name: Build Kernel with KSU-Next and SUSFS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 wget
+    
+    - name: Clone kernel source
+      run: |
+        git clone --depth=1 https://github.com/Motorola-Miami/android_kernel_motorola_sm6375 kernel
+        cd kernel
+    
+    - name: Download toolchain
+      run: |
+        mkdir -p toolchain
+        cd toolchain
+        wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/master.tar.gz
+        tar -xzf master.tar.gz
+        cd ..
+    
+    - name: Integrate KSU-Next
+      run: |
+        cd kernel
+        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
+    
+    - name: Integrate SUSFS
+      run: |
+        cd kernel
+        git clone -b kernel-5.4 https://gitlab.com/simonpunk/susfs4ksu.git susfs
+        cp -r susfs/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch .
+        cp -r susfs/kernel_patches/50_add_susfs_in_kernel-5.4.patch .
+        patch -p1 < 10_enable_susfs_for_ksu.patch
+        patch -p1 < 50_add_susfs_in_kernel-5.4.patch
+    
+    - name: Download kernel config
+      run: |
+        cd kernel
+        wget -O .config https://gist.githubusercontent.com/Sklen34/ba4d4b4399290aa03cc3dadc91720adc/raw/705ef6be4d48f3ce944d776bbd3cd675d68d32b7/Config
+    
+    - name: Build kernel
+      run: |
+        cd kernel
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export CROSS_COMPILE=$(pwd)/../toolchain/bin/aarch64-linux-android-
+        make oldconfig
+        make -j$(nproc)
+    
+    - name: Upload kernel image
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-ksu-susfs
+        path: kernel/arch/arm64/boot/Image.gz-dtb
